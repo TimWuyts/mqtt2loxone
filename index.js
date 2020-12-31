@@ -197,7 +197,7 @@ udpServer.on('message', (message, remote) => {
         payload = JSON.stringify(payload)
         break
     case 'json_raw':
-        payload = JSON.stringify(payload)
+        // nothing specific at the moment
         break
     }
 
