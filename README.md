@@ -41,7 +41,7 @@ ENTRYPOINT [ "/usr/local/bin/mqtt2loxone", "/etc/mqtt2loxone.json" ]
 
 ## Configuration
 
-The following configuration file is an example. Please replace the desired
+The configuration file is an example. Please rename to "config.json" and replace the desired
 values like the mqtt url and add your loxone ip address, username and password.
 
 ```json
