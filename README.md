@@ -48,17 +48,17 @@ values like the mqtt url and add your loxone ip address, username and password.
 {
     "log": "debug",
     "mqtt": {
-        "url": "mqtt://192.168.1.10",
+        "url": "mqtt://x.x.x.x",
         "name": "loxone",
         "secure": false
     },
     "loxone": {
-        "host": "192.168.1.20",
+        "host": "x.x.x.x",
         "port": 4000,
         "username": "user",
         "password": "pass",
         "subscriptions": [
-            "/my/topic/#"
+            "my/topic/#"
         ]
     }
 }
