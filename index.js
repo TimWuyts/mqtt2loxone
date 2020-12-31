@@ -159,7 +159,7 @@ udpServer.on('message', (message, remote) => {
     }
 
     // add the default prefix if the custom prefix is not specified
-    let mode = 'json'
+    let mode = 'json_raw'
 
     if (messageParts.length > 5) {
         mode = messageParts[5]
