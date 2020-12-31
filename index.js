@@ -183,7 +183,8 @@ udpServer.on('message', (message, remote) => {
     // prepare the payload object with timestamp, value and optionally the name
     let payload = parsedValue
 
-    if (mode === 'json') {
+    switch (mode) {
+    case 'json':
         payload = {
             ts: Date.now(),
             val: parsedValue
@@ -194,6 +195,10 @@ udpServer.on('message', (message, remote) => {
         }
 
         payload = JSON.stringify(payload)
+        break
+    case 'json_raw':
+        payload = JSON.stringify(payload)
+        break
     }
 
     log.info('mqtt: publish ' + topic + ' ' + payload)
