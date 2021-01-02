@@ -52,51 +52,30 @@ mqttClient.on('error', err => {
 })
 
 mqttClient.on('message', (topic, payload, msg) => {
+    payload = JSON.parse(payload.toString())
+
     log.info('mqtt: message ' + topic + ' ' + payload.toString())
 
-    // try to parse the payload. If not possible, add null as payload.
-    const payloadString = payload.toString()
+    if ('val' in payload) {
+        if (typeof (payload.val) !== 'string') {
+            let message = topic
 
-    if (!isNaN(payloadString)) {
-        payload = { val: Number(payloadString), name: 'unknown' }
+            if (payload.val != null) message += '=' + payload.val
+
+            udpMessage(message)
+        } else {
+            apiMessage(('name' in payload) ? payload.name : 'unknown', payload.val)
+        }
     } else {
-        try {
-            payload = JSON.parse(payloadString)
-        } catch (error) {
-            payload = { val: null, name: 'unknown' }
-        }
-    }
+        const entries = Object.entries(payload)
 
-    // use the udp datagram api for non-text like bool, number, null.
-    if (typeof (payload.val) !== 'string') {
-        const udpClient = dgram.createSocket('udp4')
-        let message = topic
-
-        log.info('udp client: send datagram ' + message)
-
-        if (payload.val != null) {
-            message += '=' + payload.val
-        }
-
-        udpClient.send(message, cfg.loxone.port, cfg.loxone.host, (error) => {
-            if (error) {
-                log.error('udp client error: ' + error)
+        for (const [key, value] of entries) {
+            if (typeof (value) !== 'string') {
+                if (value != null) udpMessage(key + '=' + value)
+            } else {
+                apiMessage(key, value)
             }
-            udpClient.close()
-        })
-    }
-
-    // use http, if the payload is a text value.
-    if (typeof (payload.val) === 'string') {
-        const url = encodeurl('http://' + cfg.loxone.username + ':' + cfg.loxone.password + '@' + cfg.loxone.host + '/dev/sps/io/' + payload.name + '/' + payload.val)
-
-        log.info('http client: invoke request http://' + cfg.loxone.host + '/dev/sps/io/' + payload.name + '/' + payload.val)
-
-        request(url, (error, response, body) => {
-            if (error) {
-                log.error('http client error: ' + error)
-            }
-        })
+        }
     }
 })
 
@@ -208,3 +187,34 @@ udpServer.on('message', (message, remote) => {
 udpServer.on('error', (err) => {
     log.error(err)
 })
+
+/**
+ * UDP CLIENT
+ */
+
+function udpMessage (message) {
+    const udpClient = dgram.createSocket('udp4')
+
+    log.info('udp client: send datagram ' + message)
+
+    udpClient.send(message, cfg.loxone.port, cfg.loxone.host, (error) => {
+        if (error) log.error('udp client error: ' + error)
+
+        udpClient.close()
+    })
+}
+
+/**
+ * LOXONE API
+ */
+
+function apiMessage (name, message) {
+    const base = cfg.loxone.host + '/dev/sps/io/' + name + '/' + message
+    const url = encodeurl('http://' + cfg.loxone.username + ':' + cfg.loxone.password + '@' + base)
+
+    log.info('http client: invoke request http://' + base)
+
+    request(url, (error, response, body) => {
+        if (error) log.error('http client error: ' + error)
+    })
+}
