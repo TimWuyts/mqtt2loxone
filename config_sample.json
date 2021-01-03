@@ -5,13 +5,30 @@
         "name": "loxone",
         "secure": false
     },
+    "udp": {
+        "host": "x.x.x.x",
+        "port": 4000
+    },
     "loxone": {
         "host": "x.x.x.x",
-        "port": 4000,
+        "port": 55000,
         "username": "user",
         "password": "pass",
         "subscriptions": [
-            "my/topic/#"
+            { 
+                "topic": "my/topic/#",
+                "identifier": "my-topic",
+                "fields": [
+                    {
+                        "name": "field1",
+                        "type": "string"
+                    },
+                    {
+                        "name": "field2",
+                        "type": "number"
+                    }
+                ]
+            }
         ]
     }
 }
