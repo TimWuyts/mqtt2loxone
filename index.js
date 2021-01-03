@@ -7,7 +7,7 @@
 const log = require('yalm')
 const mqtt = require('mqtt')
 const dgram = require('dgram')
-const request = require('request')
+const fetch = require('node-fetch')
 const encodeurl = require('encodeurl')
 
 const pkg = require('./package.json')
@@ -243,7 +243,5 @@ function apiMessage (topic, name, message) {
 
     log.info('http client: invoke request http://' + base)
 
-    request(url, (error, response, body) => {
-        if (error) log.error('http client error: ' + error)
-    })
+    fetch(url).catch(error => log.error('http client error: ' + error))
 }

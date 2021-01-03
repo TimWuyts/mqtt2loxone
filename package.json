@@ -29,7 +29,7 @@
     "encodeurl": "^1.0.2",
     "express": "^4.17.1",
     "mqtt": "^2.18.8",
-    "request": "^2.88.0",
+    "node-fetch": "^2.6.1",
     "yalm": "^4.1.0"
   },
   "devDependencies": {
