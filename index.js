@@ -14,7 +14,7 @@ const pkg = require('./package.json')
 const cfg = require(process.argv[2] || './config.json')
 
 log.setLevel(cfg.log)
-log.info(pkg.name + ' ' + pkg.version + ' starting')
+log.info(`${pkg.name} ${pkg.version} starting`)
 
 /**
  * SETUP MQTT
@@ -32,11 +32,11 @@ const mqttClient = mqtt.connect(
 )
 
 mqttClient.on('connect', () => {
-    mqttClient.publish(cfg.mqtt.name + '/connected', '2', { retain: true })
+    mqttClient.publish(`${cfg.mqtt.name}/connected`, '2', { retain: true })
 
-    log.info('mqtt: connected ' + cfg.mqtt.url)
+    log.info(`mqtt: connected ${cfg.mqtt.url}`)
 
-    mqttClient.subscribe(cfg.mqtt.name + '/set/#')
+    mqttClient.subscribe(`${cfg.mqtt.name}/set/#`)
 
     cfg.loxone.subscriptions.forEach((subscription) => {
         mqttClient.subscribe(subscription.topic)
@@ -44,18 +44,18 @@ mqttClient.on('connect', () => {
 })
 
 mqttClient.on('close', () => {
-    log.info('mqtt: disconnected ' + cfg.mqtt.url)
+    log.info(`mqtt: disconnected ${cfg.mqtt.url}`)
 })
 
 mqttClient.on('error', err => {
-    log.error('mqtt: error ' + err.message)
+    log.error(`mqtt: error ${err.message}`)
 })
 
 mqttClient.on('message', (topic, payload, msg) => {
     const payloadString = payload.toString()
 
     payload = JSON.parse(payloadString)
-    log.info('mqtt: message ' + topic + ' ' + payloadString)
+    log.info(`mqtt: message ${topic} ${payloadString}`)
 
     // payload equals to "param=value"
     if (typeof (payload) === 'string') {
@@ -67,17 +67,34 @@ mqttClient.on('message', (topic, payload, msg) => {
         if (typeof (payload.val) === 'string') {
             apiMessage(topic, payload.name, payload.val)
         } else {
-            udpMessage(topic, payload.name + '=' + payload.val)
+            udpMessage(topic, `${payload.name}=${payload.val}`)
         }
     } else {
         // payload equals to "{ param1: val1, param2: val2, ... }"
-        const entries = Object.entries(payload)
+        const subscription = cfg.loxone.subscriptions.find(item => item.topic.includes(topic))
 
-        for (const [key, value] of entries) {
-            if (typeof (value) === 'string') {
-                apiMessage(topic, key, value)
-            } else {
-                if (value != null) udpMessage(topic, key + '=' + value)
+        if (subscription && subscription.fields) {
+            // follow pre-defined field definitions
+            for (const field of subscription.fields) {
+                const key = field.name
+                const value = payload[key]
+
+                if (field.type === 'string') {
+                    apiMessage(topic, key, String(value))
+                } else {
+                    udpMessage(topic, `${key}=${value}`)
+                }
+            }
+        } else {
+            // loop trough all available fields
+            const entries = Object.entries(payload)
+
+            for (const [key, value] of entries) {
+                if (typeof (value) === 'string') {
+                    apiMessage(topic, key, value)
+                } else {
+                    if (value != null) udpMessage(topic, `${key}=${value}`)
+                }
             }
         }
     }
@@ -91,18 +108,18 @@ const udpServer = dgram.createSocket('udp4')
 udpServer.bind(cfg.loxone.port)
 
 udpServer.on('listening', () => {
-    log.info('udp server: listen on udp://' + udpServer.address().address + ':' + udpServer.address().port)
+    log.info(`udp server: listen on udp://${udpServer.address().address}:${udpServer.address().port}`)
 })
 
 udpServer.on('close', () => {
-    log.info('udp server: closed')
+    log.info(`udp server: closed`)
 })
 
 udpServer.on('message', (message, remote) => {
     message = message.toString().trim()
     let messageParts = message.split(';')
 
-    log.info('udp server: message from udp://' + remote.address + ':' + remote.port + ' => ' + message)
+    log.info(`udp server: message from udp://${remote.address}:${remote.port} => ${message}`)
 
     // check if the message was send by the logger or by the UDP virtual output and concatenate the array if it's the logger
     const regexLogger = /^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2};.*$/g
@@ -184,7 +201,7 @@ udpServer.on('message', (message, remote) => {
         break
     }
 
-    log.info('mqtt: publish ' + topic + ' ' + payload)
+    log.info(`mqtt: publish ${topic} ${payload}`)
     mqttClient.publish(topic, payload, { qos: qos, retain: retain })
 })
 
@@ -207,19 +224,19 @@ function udpMessage (topic, message) {
     const subscription = cfg.loxone.subscriptions.find(item => item.topic.includes(topic))
 
     if (subscription && subscription.identifier !== '') {
-        param = subscription.identifier + '_' + param
+        param = `${subscription.identifier}_${param}`
     }
 
     // cast boolean(ish) values to number values
     if (value === 'true' || value === 'yes') value = 1
-    if (value === 'false' || value === 'no' || value === 'null') value = 0
+    if (value === 'false' || value === 'no' || value === 'null' || value === null) value = 0
 
     // perform request
     message = (param + '=' + value).toLowerCase()
-    log.info('udp client: send datagram ' + message)
+    log.info(`udp client: send datagram ${message}`)
 
     udpClient.send(message, cfg.loxone.port, cfg.loxone.host, (error) => {
-        if (error) log.error('udp client error: ' + error)
+        if (error) log.error(`udp client error: ${error}`)
 
         udpClient.close()
     })
@@ -234,14 +251,14 @@ function apiMessage (topic, name, message) {
     const subscription = cfg.loxone.subscriptions.find(item => item.topic.includes(topic))
 
     if (subscription && subscription.identifier !== '') {
-        name = subscription.identifier + ' - ' + name
+        name = `${subscription.identifier} - ${name}`
     }
 
     // perform request
-    const base = cfg.loxone.host + '/dev/sps/io/' + name + '/' + message
-    const url = encodeurl('http://' + cfg.loxone.username + ':' + cfg.loxone.password + '@' + base)
+    const base = `${cfg.loxone.host}/dev/sps/io/${name}/${message}`
+    const url = encodeurl(`http://${cfg.loxone.username}:${cfg.loxone.password}@${base}`)
 
-    log.info('http client: invoke request http://' + base)
+    log.info(`http client: invoke request http://${base}`)
 
-    fetch(url).catch(error => log.error('http client error: ' + error))
+    fetch(url).catch(error => log.error(`http client error: ${error}`))
 }
