@@ -105,7 +105,7 @@ mqttClient.on('message', (topic, payload, msg) => {
  */
 
 const udpServer = dgram.createSocket('udp4')
-udpServer.bind(cfg.loxone.port)
+udpServer.bind(cfg.udp.port)
 
 udpServer.on('listening', () => {
     log.info(`udp server: listen on udp://${udpServer.address().address}:${udpServer.address().port}`)
@@ -235,7 +235,7 @@ function udpMessage (topic, message) {
     message = (param + '=' + value).toLowerCase()
     log.info(`udp client: send datagram ${message}`)
 
-    udpClient.send(message, cfg.loxone.port, cfg.loxone.host, (error) => {
+    udpClient.send(message, cfg.udp.port, cfg.udp.host, (error) => {
         if (error) log.error(`udp client error: ${error}`)
 
         udpClient.close()
@@ -255,10 +255,8 @@ function apiMessage (topic, name, message) {
     }
 
     // perform request
-    const base = `${cfg.loxone.host}/dev/sps/io/${name}/${message}`
-    const url = encodeurl(`http://${cfg.loxone.username}:${cfg.loxone.password}@${base}`)
+    const url = encodeurl(`http://${cfg.loxone.username}:${cfg.loxone.password}@${cfg.loxone.host}:${cfg.loxone.port}/dev/sps/io/${name}/${message}`)
 
-    log.info(`http client: invoke request http://${base}`)
-
+    log.info(`http client: invoke request ${url}`)
     fetch(url).catch(error => log.error(`http client error: ${error}`))
 }
