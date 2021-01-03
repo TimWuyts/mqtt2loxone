@@ -38,9 +38,9 @@ mqttClient.on('connect', () => {
 
     mqttClient.subscribe(cfg.mqtt.name + '/set/#')
 
-    for (const subscriptionKey in cfg.loxone.subscriptions) {
-        mqttClient.subscribe(cfg.loxone.subscriptions[subscriptionKey])
-    }
+    cfg.loxone.subscriptions.forEach((subscription) => {
+        mqttClient.subscribe(subscription.topic)
+    })
 })
 
 mqttClient.on('close', () => {
@@ -52,28 +52,32 @@ mqttClient.on('error', err => {
 })
 
 mqttClient.on('message', (topic, payload, msg) => {
-    payload = JSON.parse(payload.toString())
+    const payloadString = payload.toString()
 
-    log.info('mqtt: message ' + topic + ' ' + payload.toString())
+    payload = JSON.parse(payloadString)
+    log.info('mqtt: message ' + topic + ' ' + payloadString)
+
+    // payload equals to "param=value"
+    if (typeof (payload) === 'string') {
+        udpMessage(topic, payload)
+    }
 
     if ('val' in payload) {
-        if (typeof (payload.val) !== 'string') {
-            let message = topic
-
-            if (payload.val != null) message += '=' + payload.val
-
-            udpMessage(message)
+        // payload equals to "{ name: param, val: value }"
+        if (typeof (payload.val) === 'string') {
+            apiMessage(topic, payload.name, payload.val)
         } else {
-            apiMessage(('name' in payload) ? payload.name : 'unknown', payload.val)
+            udpMessage(topic, payload.name + '=' + payload.val)
         }
     } else {
+        // payload equals to "{ param1: val1, param2: val2, ... }"
         const entries = Object.entries(payload)
 
         for (const [key, value] of entries) {
-            if (typeof (value) !== 'string') {
-                if (value != null) udpMessage(key + '=' + value)
+            if (typeof (value) === 'string') {
+                apiMessage(topic, key, value)
             } else {
-                apiMessage(key, value)
+                if (value != null) udpMessage(topic, key + '=' + value)
             }
         }
     }
@@ -192,9 +196,26 @@ udpServer.on('error', (err) => {
  * UDP CLIENT
  */
 
-function udpMessage (message) {
+function udpMessage (topic, message) {
     const udpClient = dgram.createSocket('udp4')
+    const parts = message.split('=')
 
+    let param = parts[0]
+    let value = parts[1]
+
+    // set field identifier, if needed
+    const subscription = cfg.loxone.subscriptions.find(item => item.topic.includes(topic))
+
+    if (subscription && subscription.identifier !== '') {
+        param = subscription.identifier + '_' + param
+    }
+
+    // cast boolean(ish) values to number values
+    if (value === 'true' || value === 'yes') value = 1
+    if (value === 'false' || value === 'no' || value === 'null') value = 0
+
+    // perform request
+    message = (param + '=' + value).toLowerCase()
     log.info('udp client: send datagram ' + message)
 
     udpClient.send(message, cfg.loxone.port, cfg.loxone.host, (error) => {
@@ -208,7 +229,15 @@ function udpMessage (message) {
  * LOXONE API
  */
 
-function apiMessage (name, message) {
+function apiMessage (topic, name, message) {
+    // set field identifier, if needed
+    const subscription = cfg.loxone.subscriptions.find(item => item.topic.includes(topic))
+
+    if (subscription && subscription.identifier !== '') {
+        name = subscription.identifier + ' - ' + name
+    }
+
+    // perform request
     const base = cfg.loxone.host + '/dev/sps/io/' + name + '/' + message
     const url = encodeurl('http://' + cfg.loxone.username + ':' + cfg.loxone.password + '@' + base)
 
